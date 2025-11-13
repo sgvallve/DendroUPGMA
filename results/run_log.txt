@@ -1,0 +1,41 @@
+UPGMAboot run log — 2025-11-13 18:23:53.077003
+
+Command-line arguments:
+  input: data.tsv
+  output: results
+  type: data
+  delimiter: \t
+  method: 2
+  linkage: upgma
+  remove_zero_columns: 0
+  remove_constant_columns: 0
+  omit_identical_rows: 0
+  normalize_data: 0
+  scale_d: 1.0
+  tree_layout: r
+  boot_reps: 10
+
+
+Column delimiter used for parsing: \t
+
+Number of rows (samples): 10
+Number of columns (variables): 10
+
+Messages:
+[INFO] Detected input type: data
+[INFO] No duplicate row labels detected.
+[INFO] Binary data detected (all values 0 or 1).
+[INFO] Using method 2: Jaccard (binary only)
+[INFO] Converted similarity to distance using d = 1 - s.
+[INFO] Tree successfully built using UPGMA.
+[INFO] Number of leaves (samples in final matrix): 10
+Tree in Newick format:
+(((((((a1:0.0500,a6:0.0500):0.0806,a8:0.1306):0.0673,(a7:0.1429,a10:0.1429):0.0550):0.0377,(a4:0.0714,a9:0.0714):0.1641):0.0081,a3:0.2437):0.1593,a2:0.4029):0.0971,a5:0.5000);
+[INFO] Cophenetic correlation coefficient (CCC): 0.9564
+[INFO] Toytree is available. Dendrogram PNG files can be generated.
+[INFO] Generated 10 bootstrap trees by resampling columns with replacement.
+[INFO] All 10 bootstrap trees written to results/bootstrap_trees.txt.
+[INFO] Bootstrap support values assigned to internal nodes (in percent).
+[INFO] Bootstrap tree with support values written to results/tree_bootstrap.newick.
+[INFO] Bootstrap dendrogram PNG created: results/dendrogram_bootstrap_upgma.png
+

@@ -1,0 +1,1 @@
+Cophenetic Correlation Coefficient (CCC): 0.956419

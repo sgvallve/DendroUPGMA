@@ -73,7 +73,11 @@ def read_fasta_numeric(path: str, delimiter: str = r'[\s,]+') -> Tuple[List[str]
                 row_labels.append(current_label)
             else:
                 parts = re.split(delimiter, line)
-                print
+                if len(parts) <= 1:
+                     raise ValueError("Input line could not be split into multiple fields. "
+                            "This suggests that the selected delimiter is incorrect.\n"
+                            f"Line read: {line!r}\n"
+                            f"Delimiter used: {delimiter!r}")
                 values = [float(x) for x in parts if x]
                 rows.append(values)
 
@@ -102,25 +106,30 @@ def read_tabular(path: str,  delimiter: str = r'[\s,]+') -> Tuple[List[str], np.
     rows: List[List[float]] = []
     row_labels: List[str] = []
     col_labels: Optional[List[str]] = None
+    first_data_line = True
 
     with open(path, 'r') as f:
         for line in f:
-            line = line.strip()
+            line = line.rstrip()
             if (not line) or line.startswith('#'):
                 continue
             parts = re.split(delimiter, line)
-            # Check if this is an all-numeric line and col_labels is not set yet
-            if col_labels is None and all(_is_number(p) for p in parts):
-                # No explicit row label column
-                row_labels.append(f'R{len(row_labels) + 1}')
-                rows.append([float(x) for x in parts])
-            else:
-                # First column is row label, others are numeric
-                row_labels.append(parts[0])
-                rows.append([float(x) for x in parts[1:]])
-                if col_labels is None:
-                    col_labels = [f'Var{i+1}' for i in range(len(parts) - 1)]
-
+            if len(parts) <= 1:
+                  raise ValueError("Input line could not be split into multiple fields. "
+                         "This suggests that the selected delimiter is incorrect.\n"
+                         f"Line read: {line!r}\n"
+                         f"Delimiter used: {delimiter!r}")
+            # --- Detect header line ---
+            if first_data_line  and not all(_is_number(p) for p in parts[1:]):
+            # This is a header
+                col_labels = parts[1:]  # Skip first column (row labels)
+                first_data_line = False
+                continue
+            
+            first_data_line = False
+            row_labels.append(parts[0])
+            rows.append([float(x) for x in parts[1:]])
+            
     data = np.array(rows, dtype=float)
     if col_labels is None:
         col_labels = [f'Var{i+1}' for i in range(data.shape[1])]
@@ -135,6 +144,8 @@ def detect_input_type(row_labels: List[str], data: np.ndarray) -> str:
     """
     n, m = data.shape
     if n == m:
+        if not np.allclose(data, data.T):
+            return 'data'
         # Check diagonal values
         diag = np.diag(data)
         if np.allclose(diag, 1.0):
@@ -248,6 +259,7 @@ def omit_identical_rows(
     row_labels = [lab for i, lab in enumerate(row_labels) if i not in to_remove]
 
     return data, row_labels, omitted
+
 
 def normalize_data(data: np.ndarray) -> np.ndarray:
     """
@@ -1018,6 +1030,7 @@ def main():
         sys.exit(1)
 
     try:
+        # Detect whether the input is FASTA-like or tabular
         if first_line.lstrip().startswith('>'):
             row_labels, data, col_labels = read_fasta_numeric(args.input, args.delimiter)
             detected_type = 'data'
@@ -1027,9 +1040,18 @@ def main():
             detected_type = detect_input_type(row_labels, data)
             messages_input = [f'[INFO] Detected input type: {detected_type}']
     except Exception as e:
+        # If anything fails during input processing, write the log and exit
         write_run_log(args.output, args, [], [], np.zeros((0, 0)), [], error_msg=str(e))
         print(f'[ERROR] {e}')
         sys.exit(1)
+
+    # If user explicitly selected an input type, validate consistency
+    if args.type != "auto":
+        if args.type != detected_type:
+            raise ValueError(
+                f"Input type mismatch: you selected '{args.type}', "
+                f"but data appears to be '{detected_type}'."
+            )
 
     input_type = args.type if args.type != 'auto' else detected_type
 

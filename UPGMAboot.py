@@ -177,30 +177,77 @@ def remove_constant_columns(data: np.ndarray, col_labels: List[str]) -> Tuple[np
     return data[:, keep_mask], [lab for lab, k in zip(col_labels, keep_mask) if k], removed
 
 
-def omit_identical_rows(data: np.ndarray, row_labels: List[str]) -> Tuple[np.ndarray, List[str], List[str]]:
+def omit_identical_rows(
+        data: np.ndarray,
+        row_labels: List[str],
+        input_type: str
+    ) -> Tuple[np.ndarray, List[str], List[str]]:
     """
-    Remove duplicated (identical) rows, keeping the first occurrence.
+    Removes duplicated taxa depending on input type.
 
-    Returns
-    -------
-    filtered_data, filtered_row_labels, removed_row_labels
+    Returns:
+        data          -> updated matrix
+        row_labels    -> updated labels
+        omitted       -> list of labels removed
     """
-    seen = {}
-    keep_indices = []
-    removed_labels = []
 
-    for i, row in enumerate(data):
-        key = tuple(row)
-        if key not in seen:
-            seen[key] = i
-            keep_indices.append(i)
-        else:
-            removed_labels.append(row_labels[i])
+    n = len(data)
+    to_remove = set()
 
-    filtered_data = data[keep_indices, :]
-    filtered_labels = [row_labels[i] for i in keep_indices]
-    return filtered_data, filtered_labels, removed_labels
+    # === CASE 1: distance matrix → duplicates where distance == 0 ===
+    if input_type == "distance":
+        for i in range(n):
+            for j in range(i + 1, n):
+                if data[i, j] == 0:
+                    to_remove.add(j)
 
+        if not to_remove:
+            return data, row_labels, []
+
+        idx = sorted(to_remove)
+        omitted = [row_labels[i] for i in idx]
+
+        data = np.delete(data, idx, axis=0)
+        data = np.delete(data, idx, axis=1)
+        row_labels = [lab for i, lab in enumerate(row_labels) if i not in to_remove]
+
+        return data, row_labels, omitted
+
+    # === CASE 2: similarity matrix → duplicates where similarity == 1 ===
+    if input_type == "similarity":
+        for i in range(n):
+            for j in range(i + 1, n):
+                if data[i, j] == 1:
+                    to_remove.add(j)
+
+        if not to_remove:
+            return data, row_labels, []
+
+        idx = sorted(to_remove)
+        omitted = [row_labels[i] for i in idx]
+
+        data = np.delete(data, idx, axis=0)
+        data = np.delete(data, idx, axis=1)
+        row_labels = [lab for i, lab in enumerate(row_labels) if i not in to_remove]
+
+        return data, row_labels, omitted
+
+    # === CASE 3: data or fasta → identical rows ===
+    for i in range(n):
+        for j in range(i + 1, n):
+            if np.array_equal(data[i], data[j]):
+                to_remove.add(j)
+
+    if not to_remove:
+        return data, row_labels, []
+
+    idx = sorted(to_remove)
+    omitted = [row_labels[i] for i in idx]
+
+    data = np.delete(data, idx, axis=0)
+    row_labels = [lab for i, lab in enumerate(row_labels) if i not in to_remove]
+
+    return data, row_labels, omitted
 
 def normalize_data(data: np.ndarray) -> np.ndarray:
     """
@@ -796,7 +843,7 @@ def run_upgmaboot_core(row_labels: List[str], col_labels: List[str], data: np.nd
 
     omitted_rows: List[str] = []
     if omit_identical:
-        data, row_labels, omitted_rows = omit_identical_rows(data, row_labels)
+        data, row_labels, omitted_rows = omit_identical_rows(data, row_labels, input_type)
         if omitted_rows:
             messages.append(f"[INFO] Removed {len(omitted_rows)} identical rows: {', '.join(omitted_rows)}")
         else:
